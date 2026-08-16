@@ -1,0 +1,15 @@
+api_version = "2025-10"
+
+[[extensions]]
+type = "ui_extension"
+name = "Distrito en el checkout"
+handle = "distrito-checkout"
+uid = "4aedbf67-e87f-413a-bdaf-5edabe0c583f1bdd0588"
+
+  # Se monta justo antes del formulario de dirección. Es un objetivo estático:
+  # aparece solo con la app instalada, sin que el comerciante tenga que
+  # colocarlo en el editor de checkout.
+  [[extensions.targeting]]
+  target = "purchase.checkout.delivery-address.render-before"
+  module = "./src/Checkout.jsx"
+  export = "default"

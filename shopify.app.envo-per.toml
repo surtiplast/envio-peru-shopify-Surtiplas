@@ -1,0 +1,48 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Envío Perú"
+client_id = "e1c11f87ba42acdb0a63898f0f133f47"
+application_url = "https://envio-peru.onrender.com"
+embedded = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_draft_orders,read_orders,write_orders,read_products,write_shipping"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://envio-peru.onrender.com/auth/callback",
+  "https://envio-peru.onrender.com/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app-subscriptions/update"
+  topics = [ "app_subscriptions/update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
+  # Los webhooks de privacidad (GDPR / Ley de protección de datos) no son
+  # topics normales: van en su propio campo. Declararlos en `topics` hace que
+  # el despliegue falle con "The following topic is invalid".
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[app_proxy]
+url = "https://envio-peru.onrender.com/proxy"
+subpath = "envio"
+prefix = "apps"
+
+[pos]
+embedded = false

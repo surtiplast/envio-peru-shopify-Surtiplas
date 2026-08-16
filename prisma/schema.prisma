@@ -1,0 +1,499 @@
+// ---------------------------------------------------------------------------
+//  Envío Perú — esquema de base de datos (PostgreSQL)
+//
+//  Principios de diseño
+//  1. MULTI-TIENDA ESTRICTO: todo lo que pertenece a un comerciante lleva shopId
+//     y forma parte de sus índices únicos. Ninguna consulta de la app toca una
+//     tabla de negocio sin filtrar por shopId (ver app/lib/db.server.ts).
+//  2. GEOGRAFÍA COMPARTIDA: Departamento/Provincia/Distrito son datos oficiales
+//     del INEI, iguales para todas las tiendas. Se guardan una sola vez como
+//     catálogo de solo lectura. Lo que cambia por tienda son las TARIFAS.
+//  3. RANGOS NORMALIZADOS: el CSV trae rango1_*, rango2_*, ... en columnas.
+//     Aquí cada rango es una FILA. Así no hay límite de rangos y el motor de
+//     cálculo resuelve con un índice en vez de con 30 columnas.
+//  4. ESCALA: pensado para cientos de miles de filas de tarifa. Los campos que
+//     se filtran en el admin (departamento/provincia/distrito) están
+//     desnormalizados sobre Tarifa para listar sin JOINs.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Conexión de la aplicación. Con Neon u otro Postgres serverless, usa aquí
+  // la cadena CON pooler (-pooler en el host): aguanta muchas conexiones cortas.
+  url      = env("DATABASE_URL")
+  // Conexión directa, SIN pooler. Prisma la necesita para migrar: las
+  // migraciones abren transacciones largas que un pooler en modo transaction
+  // corta por la mitad. Si tu Postgres no tiene pooler, pon el mismo valor.
+  directUrl = env("DIRECT_URL")
+}
+
+// ===========================================================================
+//  SESIONES DE SHOPIFY (requerido por @shopify/shopify-app-session-storage-prisma)
+// ===========================================================================
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+
+  @@index([shop])
+}
+
+// ===========================================================================
+//  TIENDA (tenant)
+// ===========================================================================
+
+model Shop {
+  id        String  @id @default(cuid())
+  /// Dominio myshopify, p.ej. mi-tienda.myshopify.com. Clave del tenant.
+  dominio   String  @unique
+  nombre    String?
+  email     String?
+  moneda    String  @default("PEN")
+  pais      String  @default("PE")
+  zonaHoraria String @default("America/Lima")
+
+  /// Plan de Shopify de la tienda; determina si CarrierService está disponible.
+  planShopify         String?
+  /// ID del CarrierService registrado en Shopify (gid://shopify/DeliveryCarrierService/...)
+  carrierServiceGid   String?
+  carrierServiceEstado CarrierEstado @default(NO_REGISTRADO)
+  carrierServiceError String?
+
+  instalada     Boolean   @default(true)
+  desinstaladaEn DateTime?
+  creadaEn      DateTime  @default(now())
+  actualizadaEn DateTime  @updatedAt
+
+  tarifas        Tarifa[]
+  puntosRecojo   PuntoRecojo[]
+  apariencia     Apariencia?
+  ajustes        Ajustes?
+  suscripcion    Suscripcion?
+  importaciones  Importacion[]
+  eventos        Evento[]
+  consultasDoc   ConsultaDocumento[]
+  sesionesEnvio  SesionEnvio[]
+
+  @@index([instalada])
+}
+
+enum CarrierEstado {
+  NO_REGISTRADO
+  ACTIVO
+  NO_ELEGIBLE // la tienda no cumple los requisitos de plan de Shopify
+  ERROR
+}
+
+// ===========================================================================
+//  CATÁLOGO GEOGRÁFICO OFICIAL (INEI) — compartido, solo lectura
+// ===========================================================================
+
+model Departamento {
+  codigo     String      @id @db.Char(2) // "15"
+  nombre     String
+  /// Nombre normalizado (sin tildes, MAYÚSCULAS) para búsqueda difusa.
+  clave      String
+  provincias Provincia[]
+
+  @@index([clave])
+}
+
+model Provincia {
+  codigo       String       @id @db.Char(4) // "1501"
+  codDep       String       @db.Char(2)
+  nombre       String
+  clave        String
+  departamento Departamento @relation(fields: [codDep], references: [codigo])
+  distritos    Distrito[]
+
+  @@index([codDep])
+  @@index([clave])
+}
+
+model Distrito {
+  /// UBIGEO INEI de 6 dígitos. SIEMPRE string: "150120" ≠ 150120.
+  ubigeo    String    @id @db.Char(6)
+  codProv   String    @db.Char(4)
+  codDep    String    @db.Char(2)
+  nombre    String
+  clave     String
+  /// Centroide aproximado, usado para desempatar geocodificación inversa.
+  latitud   Float?
+  longitud  Float?
+  provincia Provincia @relation(fields: [codProv], references: [codigo])
+  tarifas   Tarifa[]
+
+  @@index([codProv])
+  @@index([codDep])
+  @@index([clave])
+}
+
+// ===========================================================================
+//  TARIFAS
+// ===========================================================================
+
+model Tarifa {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  ubigeo   String   @db.Char(6)
+  distrito Distrito @relation(fields: [ubigeo], references: [ubigeo])
+
+  /// Desnormalizado a propósito: el listado del admin filtra y ordena por estos
+  /// campos sobre cientos de miles de filas y no queremos 3 JOINs por página.
+  codDep          String @db.Char(2)
+  codProv         String @db.Char(4)
+  nombreDep       String
+  nombreProv      String
+  nombreDist      String
+
+  /// Columna `codshopify` del CSV: código interno del comerciante, opcional.
+  codShopify String?
+  activo     Boolean @default(true)
+
+  /// Textos libres que vienen del CSV (texto, texto_description, ...). Se
+  /// conservan íntegros aunque la app no los use, para no perder información.
+  extras Json?
+
+  metodos       MetodoEnvio[]
+  creadaEn      DateTime      @default(now())
+  actualizadaEn DateTime      @updatedAt
+
+  @@unique([shopId, ubigeo])
+  @@index([shopId, codDep])
+  @@index([shopId, codProv])
+  @@index([shopId, activo])
+  @@index([shopId, nombreDist])
+}
+
+enum TipoMetodo {
+  ESTANDAR
+  EXPRESS
+  RECOJO
+}
+
+model MetodoEnvio {
+  id       String     @id @default(cuid())
+  tarifaId String
+  tarifa   Tarifa     @relation(fields: [tarifaId], references: [id], onDelete: Cascade)
+  tipo     TipoMetodo
+  activo   Boolean    @default(true)
+
+  /// Lo que ve el comprador. Si es null se usa el texto global de Ajustes.
+  etiqueta    String?
+  descripcion String?
+
+  /// Plazo de entrega estimado, en días hábiles.
+  diasMin Int?
+  diasMax Int?
+
+  /// Envío gratis incondicional a partir de este subtotal (S/). Se evalúa
+  /// ANTES de los rangos. Null = no aplica.
+  umbralEnvioGratis Decimal? @db.Decimal(10, 2)
+
+  /// Recargo por peso, encima del precio del rango.
+  ///
+  /// En gramos para no arrastrar decimales: 5 kg = 5000. El carrito que no
+  /// pase de este peso paga solo el rango. Null = sin recargo.
+  pesoIncluidoGramos Int?
+  /// Precio de cada kilo que se pase del peso incluido (S/).
+  costoPorKiloExtra  Decimal @default(0) @db.Decimal(10, 2)
+
+  rangos Rango[]
+
+  @@unique([tarifaId, tipo])
+  @@index([tipo])
+}
+
+model Rango {
+  id       String      @id @default(cuid())
+  metodoId String
+  metodo   MetodoEnvio @relation(fields: [metodoId], references: [id], onDelete: Cascade)
+
+  /// Orden 1..N, tal como venía en el CSV (rango1, rango2, ...).
+  orden    Int
+  /// Intervalo del subtotal del carrito: [montoMin, montoMax]. montoMax null =
+  /// sin límite superior. Ambos extremos INCLUSIVOS (ver motor de tarifas).
+  montoMin Decimal  @db.Decimal(10, 2)
+  montoMax Decimal? @db.Decimal(10, 2)
+
+  /// Costo principal y hasta dos alternativos (columnas costo2 / costo3 del CSV).
+  costo     Decimal  @db.Decimal(10, 2)
+  costoAlt1 Decimal? @db.Decimal(10, 2)
+  costoAlt2 Decimal? @db.Decimal(10, 2)
+
+  /// Si es true el costo se ignora y se cobra 0 mostrando "GRATIS".
+  gratis Boolean @default(false)
+
+  @@unique([metodoId, orden])
+  @@index([metodoId, montoMin])
+}
+
+// ===========================================================================
+//  PUNTOS DE RECOJO EN TIENDA
+// ===========================================================================
+
+model PuntoRecojo {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  nombre    String
+  direccion String
+  referencia String?
+  ubigeo    String? @db.Char(6)
+  horario   String?
+  telefono  String?
+  latitud   Float?
+  longitud  Float?
+  /// Costo del recojo. 0 = gratis.
+  costo     Decimal @default(0) @db.Decimal(10, 2)
+  activo    Boolean @default(true)
+  orden     Int     @default(0)
+
+  creadaEn DateTime @default(now())
+
+  @@index([shopId, activo])
+}
+
+// ===========================================================================
+//  PERSONALIZACIÓN Y AJUSTES
+// ===========================================================================
+
+model Apariencia {
+  id     String @id @default(cuid())
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  logoUrl        String?
+  nombreEmpresa  String?
+  colorPrincipal String @default("#0B5CFF")
+  colorBoton     String @default("#0B5CFF")
+  colorTextoBoton String @default("#FFFFFF")
+  /// Colores del cuerpo: texto, fondo de las tarjetas y bordes.
+  colorTexto     String @default("#1A1A1A")
+  colorFondo     String @default("#FFFFFF")
+  colorBorde     String @default("#E3E3E3")
+  radio          Int    @default(12)
+
+  /// Juego de iconos de los métodos: LINEA | SOLIDO | EMOJI.
+  /// Los dos primeros son SVG y toman el color principal; el tercero son
+  /// emojis del sistema, que no se pueden colorear.
+  juegoIconos    String @default("LINEA")
+
+  tituloEncabezado String @default("¿Dónde quieres recibir tu pedido?")
+  subtitulo        String @default("Detectaremos tu distrito para mostrarte las opciones de entrega disponibles.")
+  textoBoton       String @default("Continuar al pago")
+
+  mostrarExpress     Boolean @default(true)
+  mostrarRecojo      Boolean @default(true)
+  mostrarTelefono    Boolean @default(true)
+  mostrarReferencia  Boolean @default(true)
+  mostrarDocumento   Boolean @default(true)
+  mostrarTerminos    Boolean @default(true)
+  mostrarGeolocalizacion Boolean @default(true)
+  mostrarBuscadorDireccion Boolean @default(true)
+  /// Fecha de nacimiento: se guarda en el metacampo estándar facts.birth_date.
+  mostrarCumpleanos      Boolean @default(false)
+  /// Consentimientos de marketing. Se aplican al cliente al crearse el pedido.
+  mostrarMarketingEmail  Boolean @default(false)
+  mostrarMarketingSms    Boolean @default(false)
+
+  actualizadaEn DateTime @updatedAt
+}
+
+model Ajustes {
+  id     String @id @default(cuid())
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  /// Etiquetas por defecto de cada método cuando la tarifa no define una.
+  etiquetaEstandar     String @default("Envío estándar")
+  descripcionEstandar  String @default("Entrega en 2 a 5 días hábiles")
+  etiquetaExpress      String @default("Envío express")
+  descripcionExpress   String @default("Entrega en 24 horas")
+  etiquetaRecojo       String @default("Recojo en tienda")
+  descripcionRecojo    String @default("Sin costo de envío")
+
+  /// Qué hacer si el distrito no tiene tarifa configurada.
+  /// BLOQUEAR = no se ofrece envío; COSTO_FIJO = se usa costoPorDefecto.
+  politicaSinTarifa PoliticaSinTarifa @default(BLOQUEAR)
+  costoPorDefecto   Decimal?          @db.Decimal(10, 2)
+
+  /// Cuál de los tres costos del CSV usar (costo / costoAlt1 / costoAlt2).
+  columnaCostoActiva Int @default(0)
+
+  terminosTexto String? @db.Text
+  terminosUrl   String?
+  terminosObligatorio Boolean @default(true)
+
+  /// Contacto que se ofrece al comprador cuando su distrito no tiene cobertura.
+  /// Sin esto solo veía "no llegamos", que es un cliente perdido sin más.
+  contactoWhatsapp String?
+  contactoEmail    String?
+
+  actualizadaEn DateTime @updatedAt
+}
+
+enum PoliticaSinTarifa {
+  BLOQUEAR
+  COSTO_FIJO
+}
+
+// ===========================================================================
+//  SUSCRIPCIÓN (Shopify Billing — no se guarda ningún dato de tarjeta)
+// ===========================================================================
+
+model Suscripcion {
+  id     String @id @default(cuid())
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  /// gid://shopify/AppSubscription/...
+  chargeGid String?
+  plan      String            @default("PROFESIONAL")
+  estado    EstadoSuscripcion @default(PENDIENTE)
+  precio    Decimal?          @db.Decimal(10, 2)
+  moneda    String            @default("USD")
+  pruebaHasta DateTime?
+  periodoFin  DateTime?
+  esPrueba    Boolean          @default(false)
+
+  actualizadaEn DateTime @updatedAt
+}
+
+enum EstadoSuscripcion {
+  PENDIENTE
+  ACTIVA
+  CANCELADA
+  VENCIDA
+  RECHAZADA
+  CONGELADA
+}
+
+// ===========================================================================
+//  IMPORTACIONES
+// ===========================================================================
+
+model Importacion {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  archivo     String
+  estado      EstadoImportacion @default(ANALIZANDO)
+  /// Mapa columna CSV -> campo interno, tal como lo confirmó el comerciante.
+  mapeo       Json?
+  totalFilas  Int @default(0)
+  validos     Int @default(0)
+  nuevos      Int @default(0)
+  actualizados Int @default(0)
+  duplicados  Int @default(0)
+  errores     Int @default(0)
+  /// Detalle de errores por fila, para descargar como CSV.
+  detalleErrores Json?
+  progreso    Int @default(0)
+
+  iniciadaEn   DateTime  @default(now())
+  finalizadaEn DateTime?
+
+  @@index([shopId, iniciadaEn])
+}
+
+enum EstadoImportacion {
+  ANALIZANDO
+  ESPERANDO_CONFIRMACION
+  IMPORTANDO
+  COMPLETADA
+  FALLIDA
+  CANCELADA
+}
+
+// ===========================================================================
+//  SESIÓN DE ENVÍO — puente entre el formulario y el checkout
+// ===========================================================================
+
+model SesionEnvio {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  /// Token opaco que viaja en el atributo de carrito _envio_token.
+  token     String  @unique
+  cartToken String?
+
+  /// Datos del comprador y de la entrega. NUNCA contiene datos de pago.
+  datos     Json
+  metodo    TipoMetodo
+  ubigeo    String?  @db.Char(6)
+  costo     Decimal  @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+
+  usada     Boolean  @default(false)
+  creadaEn  DateTime @default(now())
+  expiraEn  DateTime
+
+  @@index([shopId, creadaEn])
+  @@index([expiraEn])
+}
+
+// ===========================================================================
+//  BITÁCORAS
+// ===========================================================================
+
+model Evento {
+  id     String @id @default(cuid())
+  shopId String?
+  shop   Shop?  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  nivel   NivelLog @default(INFO)
+  tipo    String   // "carrier_service.rate", "import.finish", "webhook.uninstall", ...
+  mensaje String
+  meta    Json?
+  creadoEn DateTime @default(now())
+
+  @@index([shopId, creadoEn])
+  @@index([tipo])
+}
+
+enum NivelLog {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+/// Bitácora de consultas DNI/RUC. Por privacidad NO se guarda el número
+/// completo: solo los últimos 3 dígitos, suficientes para soporte.
+model ConsultaDocumento {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  tipoDoc       String // DNI | RUC
+  ultimosDigitos String @db.Char(3)
+  resultado     String // OK | NO_ENCONTRADO | ERROR_PROVEEDOR | INVALIDO
+  proveedor     String
+  duracionMs    Int?
+  creadoEn      DateTime @default(now())
+
+  @@index([shopId, creadoEn])
+}

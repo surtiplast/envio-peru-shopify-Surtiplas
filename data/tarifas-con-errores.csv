@@ -1,0 +1,7 @@
+id,storename,codshopify,departamento,provincia,distrito,ubigeo,rango1_min,rango1_max,rango1_costo,rango1_costo2,rango1_costo3
+9001,mi-tienda,X-1,Lima,Lima,Distrito Fantasma,,0,99.99,15,20,12
+9002,mi-tienda,X-2,Lima,Lima,Miraflores,ABC123,0,99.99,15,20,12
+9003,mi-tienda,X-3,Lima,Lima,Barranco,150104,0,99.99,quince soles,20,12
+9004,mi-tienda,X-4,Lima,Lima,Surquillo,150140,0,50,15,20,12
+9005,mi-tienda,X-5,Lima,Lima,Surquillo,150140,0,99.99,18,22,14
+9006,mi-tienda,X-6,Lima,Lima,Magdalena del Mr,,0,99.99,15,20,12

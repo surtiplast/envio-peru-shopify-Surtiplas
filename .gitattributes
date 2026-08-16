@@ -1,0 +1,19 @@
+# Normaliza los finales de línea: en el repositorio siempre LF, en tu disco lo
+# que Windows prefiera. Sin esto, cada vez que edites un archivo git lo marcará
+# como modificado entero solo por el cambio de CRLF, y las diferencias reales
+# se pierden entre el ruido.
+* text=auto eol=lf
+
+# Archivos binarios: git no debe tocarlos nunca.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.xlsx binary
+*.zip binary
+
+# El CSV lo abre Excel en Windows, así que ahí sí queremos CRLF.
+*.csv text eol=crlf

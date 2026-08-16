@@ -1,0 +1,93 @@
+{% comment %}
+  Formulario de envío — bloque de app.
+
+  El comerciante lo añade desde Personalizar → plantilla Carrito → Agregar
+  bloque. No toca código del tema, y al desinstalar la app desaparece solo.
+
+  Los archivos se sirven como assets de la extensión (`asset_url`). Shopify les
+  pone su propia versión en la URL, así que al publicar una versión nueva de la
+  extensión el navegador descarga el archivo actualizado sin que nadie tenga que
+  subir a mano ningún número de versión.
+{% endcomment %}
+
+{% if cart.item_count > 0 or request.design_mode %}
+  <link rel="stylesheet" href="{{ 'form.css' | asset_url }}">
+
+  <div
+    class="envio-peru-bloque"
+    style="
+      --ep-ancho: {{ block.settings.ancho_maximo }}px;
+      padding-top: {{ block.settings.espacio_superior }}px;
+      padding-bottom: {{ block.settings.espacio_inferior }}px;
+    "
+    {{ block.shopify_attributes }}
+  >
+    {% if block.settings.titulo != blank %}
+      <h2 class="envio-peru-titulo">{{ block.settings.titulo }}</h2>
+    {% endif %}
+    <div id="ep-app"></div>
+  </div>
+
+  <style>
+    .envio-peru-bloque {
+      width: 100vw;
+      max-width: var(--ep-ancho, 860px);
+      margin-left: 50%;
+      transform: translateX(-50%);
+      padding-left: 16px;
+      padding-right: 16px;
+      box-sizing: border-box;
+    }
+    .envio-peru-bloque #ep-app { padding: 0; max-width: none; }
+    .envio-peru-titulo { font-size: 22px; margin: 0 0 12px; }
+  </style>
+
+  <script src="{{ 'form.js' | asset_url }}" defer></script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Formulario de envío",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["cart"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "titulo",
+      "label": "Título (opcional)"
+    },
+    {
+      "type": "range",
+      "id": "ancho_maximo",
+      "label": "Ancho máximo",
+      "min": 480,
+      "max": 1400,
+      "step": 20,
+      "unit": "px",
+      "default": 1400
+    },
+    {
+      "type": "range",
+      "id": "espacio_superior",
+      "label": "Espacio arriba",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "espacio_inferior",
+      "label": "Espacio abajo",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

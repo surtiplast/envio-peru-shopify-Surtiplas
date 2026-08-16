@@ -1,0 +1,6 @@
+{
+  "bloque": {
+    "nombre": "Formulario de envío",
+    "descripcion": "Pide el distrito y calcula el envío antes del checkout"
+  }
+}

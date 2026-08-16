@@ -1,0 +1,157 @@
+# Blueprint de Render para la tienda NUEVA.
+#
+# CÓMO USAR ESTE ARCHIVO
+#
+#   1. Sustituye MI-SERVICIO por el nombre que quieras (debe estar libre en
+#      Render). Aparece dos veces: en el nombre del servicio y en el de la base.
+#   2. Renómbralo a `render.yaml` en una RAMA aparte, o crea el servicio a mano
+#      desde el panel copiando estos valores. Render solo lee un `render.yaml`
+#      por repositorio y rama, así que no puedes tener dos blueprints activos
+#      en `main` a la vez — por eso el servicio existente sigue con el suyo.
+#   3. En Render: New -> Blueprint -> conecta el repositorio y la rama.
+#
+# DIFERENCIAS FRENTE AL render.yaml EXISTENTE
+#
+#   - Declara también la base de datos, no solo el servicio web.
+#   - Plan de PAGO, no `free`. No es opcional: ver la nota abajo.
+#   - Añade DIAGNOSTICO_CLAVE, que faltaba y dejaba /diagnostico en 404.
+
+databases:
+  # La base se declara aquí para que Render la cree y enlace sola. Si prefieres
+  # crearla a mano en el panel, borra este bloque entero y pon DATABASE_URL y
+  # DIRECT_URL como `sync: false`, pegando la Internal Database URL a mano.
+  #
+  # OJO: si dejas este bloque y ADEMÁS ya creaste una base a mano, Render creará
+  # una SEGUNDA base vacía y el servicio apuntará a la nueva. Elige un camino.
+  - name: MI-SERVICIO-db
+    databaseName: envio_peru
+    region: ohio
+    # Las bases gratuitas de Render se eliminan pasado un tiempo limitado.
+    # Para la tienda de un cliente real eso es perder las tarifas sin aviso.
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: MI-SERVICIO
+    runtime: node
+    region: ohio          # La misma que la base, o la URL interna no resuelve.
+    branch: main
+    healthCheckPath: /salud
+
+    # NO USAR `plan: free`.
+    #
+    # Los servicios gratuitos se duermen tras ~15 min sin tráfico y tardan cerca
+    # de un minuto en despertar. Shopify da a la respuesta del CarrierService un
+    # timeout dinámico de pocos segundos y NO reintenta: si no llega a tiempo,
+    # el comprador ve "no hay métodos de envío disponibles".
+    #
+    # El fallo es intermitente y por eso peligroso: mientras pruebas, el
+    # servicio está despierto y todo va bien. El cliente que entra de madrugada
+    # no puede comprar, y nadie se entera.
+    #
+    # healthCheckPath no lo evita: Render solo lo consulta al desplegar.
+    plan: starter
+
+    # --include=dev es imprescindible: Render define NODE_ENV=production, y con
+    # esa variable `npm ci` se salta las devDependencies. Pero el build LAS
+    # NECESITA: @remix-run/dev, vite, prisma y tsx están ahí. Sin la bandera,
+    # `npm run build` falla con "remix: not found".
+    #
+    # migrate deploy aplica migraciones ya creadas, nunca genera nuevas.
+    # db:seed es idempotente (usa skipDuplicates), así que se puede repetir.
+    buildCommand: >-
+      npm ci --include=dev &&
+      npx prisma generate &&
+      npx prisma migrate deploy &&
+      npm run db:seed &&
+      npm run build
+
+    startCommand: npm run start
+
+    envVars:
+      # --- Base de datos ---
+      # El Postgres de Render no expone un pooler aparte, así que las dos
+      # variables llevan la misma cadena: la INTERNA (más rápida, no sale a
+      # internet, porque servicio y base están ambos dentro de Render).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: MI-SERVICIO-db
+          property: connectionString
+      - key: DIRECT_URL
+        fromDatabase:
+          name: MI-SERVICIO-db
+          property: connectionString
+
+      - key: NODE_VERSION
+        value: "20.18.0"
+
+      # --- Shopify: se rellenan a mano en el panel de Render ---
+      - key: SHOPIFY_API_KEY
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
+      # Debe coincidir EXACTAMENTE con la URL de Render, sin barra final:
+      # https://MI-SERVICIO.onrender.com
+      - key: SHOPIFY_APP_URL
+        sync: false
+
+      # Los scopes que la app pide en la instalación salen de AQUÍ, no del
+      # shopify.app.*.toml. En app/shopify.server.ts:
+      #
+      #     scopes: process.env.SCOPES?.split(",")
+      #
+      # Si esta variable y el .toml no coinciden, manda esta. Cambiar el .toml
+      # sin cambiar esto no tiene ningún efecto.
+      #
+      # write_customers está fuera a propósito: es un scope de datos protegidos
+      # del cliente y, mientras la solicitud siga sin aprobar, pedirlo hace que
+      # Shopify devuelva HTTP 403 a TODA la Admin API — lo que tumba también el
+      # registro del CarrierService.
+      - key: SCOPES
+        value: write_shipping,read_orders,write_orders,read_products,write_draft_orders
+
+      # --- Seguridad ---
+      - key: SESSION_SIGNING_SECRET
+        generateValue: true
+      # Sin esta clave, /diagnostico devuelve 404. Faltaba en el blueprint
+      # original, así que en producción no había pantalla de estado.
+      - key: DIAGNOSTICO_CLAVE
+        generateValue: true
+
+      # --- Facturación ---
+      # true = no cobra de verdad. Correcto para una app personalizada cuyo
+      # cliente pagas por fuera. Si algún día quieres cobrar por la Billing API,
+      # cámbialo — el fallo es silencioso, no avisa nada.
+      - key: BILLING_TEST
+        value: "true"
+      - key: BILLING_PLAN_NAME
+        value: Plan Profesional
+      - key: BILLING_PLAN_AMOUNT
+        value: "19.90"
+      - key: BILLING_PLAN_CURRENCY
+        value: USD
+      - key: BILLING_TRIAL_DAYS
+        value: "7"
+
+      # --- Integraciones opcionales: la app funciona sin ellas ---
+      # Arranca con las dos en "none" y actívalas después, ya con el checkout
+      # funcionando. Así, si algo falla, sabes que no viene de aquí.
+      - key: GEO_PROVIDER
+        value: none
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: DNI_RUC_PROVIDER
+        value: none
+      - key: DNI_RUC_AUTH
+        value: none
+      - key: DNI_RUC_API_URL_DNI
+        sync: false
+      - key: DNI_RUC_API_URL_RUC
+        sync: false
+      - key: DNI_RUC_API_KEY
+        sync: false
+
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX
+        value: "60"

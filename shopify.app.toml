@@ -1,0 +1,55 @@
+# Configuración de la app. Reemplaza client_id y application_url por los de tu Partner Dashboard.
+name = "Envio Peru - Tarifas por Distrito"
+client_id = "REEMPLAZAR_CLIENT_ID"
+application_url = "https://REEMPLAZAR.tu-dominio.com"
+embedded = true
+
+[access_scopes]
+# write_shipping        -> necesario para registrar el CarrierService
+# read/write_orders     -> leer pedidos y escribir atributos/notas de entrega
+# read_products         -> mostrar el resumen del carrito
+# write_draft_orders    -> ruta alternativa cuando CarrierService no está disponible
+scopes = "write_shipping,read_orders,write_orders,read_products,write_draft_orders,write_customers"
+
+[auth]
+redirect_urls = [
+  "https://REEMPLAZAR.tu-dominio.com/auth/callback",
+  "https://REEMPLAZAR.tu-dominio.com/auth/shopify/callback",
+  "https://REEMPLAZAR.tu-dominio.com/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "/webhooks/app-subscriptions/update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
+
+  # Los webhooks de privacidad (GDPR / Ley de protección de datos) no son
+  # topics normales: van en su propio campo. Declararlos en `topics` hace que
+  # el despliegue falle con "The following topic is invalid".
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+# App Proxy: sirve el formulario del cliente DESDE EL DOMINIO DE LA TIENDA.
+# Esto es imprescindible para poder leer/escribir el carrito (cookies de primera parte).
+[app_proxy]
+url = "https://REEMPLAZAR.tu-dominio.com/proxy"
+subpath = "envio"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true

@@ -1,0 +1,15 @@
+node_modules
+/build
+/.cache
+/public/build
+.env
+.env.*
+!.env.example
+.shopify
+*.log
+/prisma/dev.db*
+/data/_tmp
+
+# Vite deja estos temporales al arrancar y a veces no los borra si el proceso
+# se corta. No son código: no deben acabar en el repositorio.
+vite.config.ts.timestamp-*

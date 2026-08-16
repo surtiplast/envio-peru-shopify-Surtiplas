@@ -1,0 +1,96 @@
+{% comment %}
+  Calculadora de envíos — bloque de app.
+
+  Deja que cualquier visitante consulte cuánto le cuesta el envío a su distrito
+  sin tener nada en el carrito. Se puede poner en una página de "Costos de
+  envío", en la ficha de producto o en el pie.
+
+  Como el formulario, se añade desde el editor del tema: nada de pegar código.
+{% endcomment %}
+
+<link rel="stylesheet" href="{{ 'form.css' | asset_url }}">
+
+<div
+  class="envio-peru-calculadora"
+  style="
+    --epc-ancho: {{ block.settings.ancho_maximo }}px;
+    padding-top: {{ block.settings.espacio_superior }}px;
+    padding-bottom: {{ block.settings.espacio_inferior }}px;
+  "
+  {{ block.shopify_attributes }}
+>
+  {% if block.settings.titulo != blank %}
+    <h2 class="envio-peru-calculadora-titulo">{{ block.settings.titulo }}</h2>
+  {% endif %}
+  {% if block.settings.subtitulo != blank %}
+    <p class="envio-peru-calculadora-sub">{{ block.settings.subtitulo }}</p>
+  {% endif %}
+  <div id="ep-calculadora"></div>
+</div>
+
+<style>
+  .envio-peru-calculadora {
+    width: 100vw;
+    max-width: var(--epc-ancho, 1400px);
+    margin-left: 50%;
+    transform: translateX(-50%);
+    padding-left: 16px;
+    padding-right: 16px;
+    box-sizing: border-box;
+  }
+  .envio-peru-calculadora-titulo { font-size: 22px; margin: 0 0 4px; }
+  .envio-peru-calculadora-sub { margin: 0 0 12px; opacity: .7; font-size: 15px; }
+</style>
+
+<script src="{{ 'calculadora.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Calculadora de envíos",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "titulo",
+      "label": "Título",
+      "default": "Calcula el costo de tu envío"
+    },
+    {
+      "type": "text",
+      "id": "subtitulo",
+      "label": "Subtítulo",
+      "default": "Elige tu distrito y verás cuánto cuesta llevarte el pedido."
+    },
+    {
+      "type": "range",
+      "id": "ancho_maximo",
+      "label": "Ancho máximo",
+      "min": 480,
+      "max": 1400,
+      "step": 20,
+      "unit": "px",
+      "default": 1400
+    },
+    {
+      "type": "range",
+      "id": "espacio_superior",
+      "label": "Espacio arriba",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "espacio_inferior",
+      "label": "Espacio abajo",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

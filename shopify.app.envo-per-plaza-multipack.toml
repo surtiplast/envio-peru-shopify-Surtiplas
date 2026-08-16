@@ -1,0 +1,61 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+#
+# App de DISTRIBUCIÓN PERSONALIZADA para Plaza Multipack.
+#
+# Las apps personalizadas están exentas del requisito de tokens offline con
+# vencimiento que bloquea a la app pública (ver docs/TOKENS-CON-VENCIMIENTO.md).
+# Por eso esta sí puede registrar el CarrierService.
+#
+# REQUISITO DE LA TIENDA: debe tener habilitadas las tarifas calculadas por
+# terceros — plan Advanced o superior, facturación anual, o tienda de
+# desarrollo. Compruébalo ANTES de atar la app a una tienda: la distribución
+# personalizada es una app por tienda y la elección no se deshace.
+#
+# OJO: `shopify app config link` regenera este archivo con `scopes = ""` y
+# `application_url = "https://example.com"`. Si se despliega así, la app se
+# instala SIN PERMISOS. Revisa siempre que siga completo antes de desplegar.
+
+client_id = "fdbdecffe1d5ecd524a682b028ca377c"
+name = "Envío Perú Plaza multipack"
+application_url = "https://innovasoft-shipping-peru.onrender.com"
+embedded = true
+
+[access_scopes]
+# write_shipping -> registrar el CarrierService. Sin esto, HTTP 403.
+scopes = "write_shipping,read_orders,write_orders,read_products,write_draft_orders"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://innovasoft-shipping-peru.onrender.com/auth/callback",
+  "https://innovasoft-shipping-peru.onrender.com/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app-subscriptions/update"
+  topics = [ "app_subscriptions/update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
+  # Los webhooks de privacidad van en su propio campo, no en `topics`.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[app_proxy]
+url = "https://innovasoft-shipping-peru.onrender.com/proxy"
+subpath = "envio"
+prefix = "apps"
+
+[pos]
+embedded = false

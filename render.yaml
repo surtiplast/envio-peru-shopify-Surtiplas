@@ -1,0 +1,110 @@
+# Blueprint de Render: solo el servicio web.
+#
+# La base de datos PostgreSQL ya existe (creada a mano en Render), así que aquí
+# NO se declara: sus cadenas de conexión se pegan en el panel. Si se declarara,
+# Render crearía una segunda base vacía.
+#
+# Para usarlo: en Render, New → Blueprint → conecta este repositorio.
+#
+# Región: Ohio es la más cercana a Perú de las que ofrece Render.
+
+services:
+  - type: web
+    name: envio-peru
+    runtime: node
+    plan: free
+    region: ohio
+    branch: main
+    healthCheckPath: /salud
+
+    # --include=dev es imprescindible: Render define NODE_ENV=production en los
+    # servicios Node, y con esa variable `npm ci` se salta las devDependencies.
+    # Pero el build LAS NECESITA: @remix-run/dev, vite, prisma y tsx están ahí.
+    # Sin esta bandera, `npm run build` falla con "remix: not found".
+    #
+    # migrate deploy aplica las migraciones ya creadas (nunca genera nuevas).
+    # db:seed es idempotente: usa skipDuplicates, así que se puede repetir.
+    buildCommand: >-
+      npm ci --include=dev &&
+      npx prisma generate &&
+      npx prisma migrate deploy &&
+      npm run db:seed &&
+      npm run build
+
+    startCommand: npm run start
+
+    envVars:
+      # --- Base de datos: ya existe. Pega en el panel la cadena INTERNA ---
+      # (la interna es más rápida y no sale a internet, porque el servicio y la
+      # base están ambos dentro de Render). Las dos con el mismo valor: el
+      # Postgres gratuito de Render no expone un pooler aparte.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+
+      - key: NODE_VERSION
+        value: "20.18.0"
+
+      # --- Shopify: se rellenan a mano en el panel de Render ---
+      - key: SHOPIFY_API_KEY
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
+      - key: SHOPIFY_APP_URL
+        sync: false
+      # OJO: los scopes que la app pide en la instalación salen de AQUÍ, no del
+      # shopify.app.*.toml. En app/shopify.server.ts:
+      #
+      #     scopes: process.env.SCOPES?.split(",")
+      #
+      # Si esta variable y el .toml no coinciden, manda esta. Cambiar el .toml
+      # sin cambiar esto no tiene ningún efecto.
+      #
+      # write_customers está fuera a propósito: es un scope de datos protegidos
+      # del cliente y, mientras la solicitud de acceso siga sin aprobar,
+      # pedirlo hace que Shopify devuelva HTTP 403 a TODA la Admin API — lo que
+      # tumba también el registro del CarrierService. Se añade de vuelta
+      # cuando Shopify apruebe los datos protegidos.
+      - key: SCOPES
+        value: write_shipping,read_orders,write_orders,read_products,write_draft_orders
+
+      # --- Seguridad: Render genera un valor aleatorio y lo guarda ---
+      - key: SESSION_SIGNING_SECRET
+        generateValue: true
+
+      # --- Facturación ---
+      - key: BILLING_PLAN_NAME
+        value: Plan Profesional
+      - key: BILLING_PLAN_AMOUNT
+        value: "19.90"
+      - key: BILLING_PLAN_CURRENCY
+        value: USD
+      - key: BILLING_TRIAL_DAYS
+        value: "7"
+      - key: BILLING_TEST
+        value: "true"
+
+      # --- Integraciones opcionales: la app funciona sin ellas ---
+      - key: GEO_PROVIDER
+        value: none
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      # Consulta DNI/RUC. Las URLs son PLANTILLAS: {numero} y {token} se
+      # escriben tal cual y la app los sustituye en cada consulta.
+      # Con el token dentro de la URL, DNI_RUC_AUTH va en "none".
+      - key: DNI_RUC_PROVIDER
+        value: api
+      - key: DNI_RUC_AUTH
+        value: none
+      - key: DNI_RUC_API_URL_DNI
+        sync: false
+      - key: DNI_RUC_API_URL_RUC
+        sync: false
+      - key: DNI_RUC_API_KEY
+        sync: false
+
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX
+        value: "60"

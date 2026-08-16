@@ -1,0 +1,90 @@
+{% comment %}
+  Formulario de envio - Envio Peru
+  Seccion de tema. Se anade y se mueve desde el editor de temas.
+{% endcomment %}
+
+{% if cart.item_count > 0 or request.design_mode %}
+  <link rel="stylesheet" href="{{ section.settings.dominio_app }}/envio/form.css">
+
+  <div class="envio-peru-seccion">
+    {% if section.settings.titulo != blank %}
+      <h2 class="envio-peru-titulo">{{ section.settings.titulo }}</h2>
+    {% endif %}
+    <div id="ep-app"></div>
+  </div>
+
+  <style>
+    .envio-peru-seccion {
+      max-width: {{ section.settings.ancho_maximo }}px;
+      margin: 0 auto;
+      padding-top: {{ section.settings.espacio_superior }}px;
+      padding-bottom: {{ section.settings.espacio_inferior }}px;
+    }
+    .envio-peru-seccion #ep-app {
+      padding: 0;
+      max-width: none;
+    }
+    .envio-peru-titulo {
+      text-align: center;
+      margin: 0 0 16px;
+      font-size: 20px;
+    }
+  </style>
+
+  <script src="{{ section.settings.dominio_app }}/envio/form.js" defer></script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Formulario de envio",
+  "settings": [
+    {
+      "type": "text",
+      "id": "dominio_app",
+      "label": "Dominio de la aplicacion",
+      "default": "https://envio-peru.onrender.com",
+      "info": "Sin barra al final"
+    },
+    {
+      "type": "text",
+      "id": "titulo",
+      "label": "Titulo sobre el formulario"
+    },
+    {
+      "type": "range",
+      "id": "ancho_maximo",
+      "label": "Ancho maximo",
+      "min": 480,
+      "max": 1200,
+      "step": 20,
+      "unit": "px",
+      "default": 720
+    },
+    {
+      "type": "range",
+      "id": "espacio_superior",
+      "label": "Espacio arriba",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "espacio_inferior",
+      "label": "Espacio abajo",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    }
+  ],
+  "presets": [
+    {
+      "name": "Formulario de envio"
+    }
+  ]
+}
+{% endschema %}

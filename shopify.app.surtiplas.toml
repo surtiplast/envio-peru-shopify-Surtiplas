@@ -1,0 +1,98 @@
+# App de DISTRIBUCIÓN PERSONALIZADA para la tienda de Surtiplas.
+#
+# ANTES DE DESPLEGAR, RELLENA DOS COSAS:
+#
+#   1. client_id  -> el Client ID de la app en el Partner Dashboard.
+#   2. MI-TIENDA   -> aparece solo en `name`. Cámbialo por el nombre real de la
+#                     tienda, o pon el que quieras que vea el comerciante.
+#
+# La URL de Render (envio-peru-shopify-surtiplas.onrender.com) ya está puesta en
+# los cuatro sitios que la necesitan: application_url, las dos redirect_urls y
+# el app_proxy.
+#
+# DESPLIEGA SIEMPRE ASÍ:
+#
+#     shopify app deploy --config surtiplas
+#
+# Sin --config, el CLI usa shopify.app.toml, que sigue lleno de placeholders
+# (REEMPLAZAR_CLIENT_ID). Es la causa más habitual de desplegar sobre la app
+# equivocada sin darte cuenta.
+#
+# REQUISITO DE LA TIENDA
+#
+# Debe tener habilitadas las tarifas calculadas por terceros. Grow con
+# facturación ANUAL las activa automáticamente. Compruébalo en el admin
+# (Configuración -> Envíos y entregas) ANTES de elegir la distribución
+# personalizada: es una app por tienda y la elección no se deshace.
+#
+# OJO CON `shopify app config link`
+#
+# Ese comando REGENERA este archivo con scopes = "", application_url =
+# "https://example.com" y el app_proxy vacío. Si se despliega así, la app se
+# instala SIN PERMISOS y el registro del CarrierService falla con HTTP 403.
+# Después de cada config link, comprueba que este archivo siga completo.
+
+client_id = "PEGAR_CLIENT_ID_DEL_PARTNER_DASHBOARD"
+name = "Envío Perú MI-TIENDA"
+application_url = "https://envio-peru-shopify-surtiplas.onrender.com"
+embedded = true
+
+[access_scopes]
+# write_shipping     -> registrar el CarrierService. Sin esto, HTTP 403.
+# read/write_orders  -> leer pedidos y escribir atributos de entrega
+# read_products      -> mostrar el resumen del carrito
+# write_draft_orders -> ruta alternativa si CarrierService no está disponible
+#
+# write_customers NO está, a propósito. Es un scope de datos protegidos del
+# cliente; mientras esa solicitud siga sin aprobar, pedirlo hace que Shopify
+# rechace TODA la petición GraphQL con 403 — lo que tumba también el registro
+# del CarrierService, que no tiene nada que ver con clientes.
+#
+# RECUERDA: los scopes que se piden en la instalación salen de la variable de
+# entorno SCOPES en Render, no de aquí. Si no coinciden, manda la variable.
+# Mantén los dos sitios sincronizados.
+scopes = "write_shipping,read_orders,write_orders,read_products,write_draft_orders"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://envio-peru-shopify-surtiplas.onrender.com/auth/callback",
+  "https://envio-peru-shopify-surtiplas.onrender.com/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app-subscriptions/update"
+  topics = [ "app_subscriptions/update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
+  # Los webhooks de privacidad (GDPR / Ley de protección de datos) no son
+  # topics normales: van en su propio campo. Declararlos en `topics` hace que
+  # el despliegue falle con "The following topic is invalid".
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+# App Proxy: sirve el formulario del comprador DESDE EL DOMINIO DE LA TIENDA.
+# Imprescindible para poder leer y escribir el carrito con cookies de primera
+# parte. Queda accesible en https://LA-TIENDA.com/apps/envio/...
+[app_proxy]
+url = "https://envio-peru-shopify-surtiplas.onrender.com/proxy"
+subpath = "envio"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+include_config_on_deploy = true

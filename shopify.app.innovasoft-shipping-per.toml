@@ -1,0 +1,71 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+#
+# Configuración de la app PÚBLICA (App Store). El entorno de pruebas es
+# shopify.app.envo-per.toml. Todo lo que cambia entre ambos está aquí y en las
+# variables de entorno de Render: el código es el mismo.
+#
+# OJO: `shopify app config link` regenera este archivo con `scopes = ""`,
+# `application_url = "https://example.com"` y el App Proxy sin rellenar. Si se
+# despliega así, la app se instala SIN PERMISOS y el registro del CarrierService
+# falla con HTTP 403. Después de cada `config link`, revisa que este archivo
+# siga completo antes de desplegar.
+
+name = "Innovasoft Shipping Perú"
+client_id = "1b4397496ff21b2e06f8f60ee28751c2"
+application_url = "https://innovasoft-shipping-peru.onrender.com"
+embedded = true
+
+[access_scopes]
+# write_shipping -> registrar el CarrierService. Sin esto, HTTP 403.
+#
+# OJO CON write_customers. Está quitado a propósito.
+#
+# Es un scope ligado a datos protegidos del cliente. Mientras el acceso a datos
+# protegidos de esta app siga en estado «Preliminar» (sin aprobar por la
+# revisión de la App Store), pedirlo hace que Shopify rechace TODA la petición
+# GraphQL con HTTP 403 «GraphQL Client: Forbidden» — no un error de campo, la
+# petición entera. Eso tumba también el registro del CarrierService, que no
+# tiene nada que ver con clientes.
+#
+# La app de distribución personalizada nunca dio este problema porque tampoco
+# lo pedía. Se añade de vuelta cuando Shopify apruebe los datos protegidos, y
+# entonces vuelven la fecha de nacimiento y los consentimientos de marketing.
+scopes = "write_shipping,read_orders,write_orders,read_products,write_draft_orders"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://innovasoft-shipping-peru.onrender.com/auth/callback",
+  "https://innovasoft-shipping-peru.onrender.com/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app-subscriptions/update"
+  topics = [ "app_subscriptions/update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
+  # Los webhooks de privacidad (GDPR / Ley de protección de datos) no son
+  # topics normales: van en su propio campo. Declararlos en `topics` hace que
+  # el despliegue falle con "The following topic is invalid".
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[app_proxy]
+url = "https://innovasoft-shipping-peru.onrender.com/proxy"
+subpath = "envio"
+prefix = "apps"
+
+[pos]
+embedded = false
