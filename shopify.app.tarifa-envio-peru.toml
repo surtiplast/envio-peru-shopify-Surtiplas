@@ -1,22 +1,14 @@
-# App de DISTRIBUCIÓN PERSONALIZADA para la tienda de Surtiplas.
+# App de DISTRIBUCIÓN PERSONALIZADA — «Tarifa de envío Perú».
 #
-# ANTES DE DESPLEGAR, RELLENA DOS COSAS:
-#
-#   1. client_id  -> el Client ID de la app en el Partner Dashboard.
-#   2. MI-TIENDA   -> aparece solo en `name`. Cámbialo por el nombre real de la
-#                     tienda, o pon el que quieras que vea el comerciante.
-#
-# La URL de Render (envio-peru-shopify-surtiplas.onrender.com) ya está puesta en
-# los cuatro sitios que la necesitan: application_url, las dos redirect_urls y
-# el app_proxy.
+# Sustituye a shopify.app.surtiplas.toml: aquella app quedó descartada al
+# apuntar este mismo servicio de Render a la app nueva. Un servicio solo puede
+# autenticar UNA app, porque SHOPIFY_API_KEY es una variable de un solo valor.
 #
 # DESPLIEGA SIEMPRE ASÍ:
 #
-#     shopify app deploy --config surtiplas
+#     shopify app deploy --config tarifa-envio-peru
 #
-# Sin --config, el CLI usa shopify.app.toml, que sigue lleno de placeholders
-# (REEMPLAZAR_CLIENT_ID). Es la causa más habitual de desplegar sobre la app
-# equivocada sin darte cuenta.
+# Sin --config, el CLI usa shopify.app.toml, que sigue lleno de placeholders.
 #
 # REQUISITO DE LA TIENDA
 #
@@ -25,6 +17,12 @@
 # (Configuración -> Envíos y entregas) ANTES de elegir la distribución
 # personalizada: es una app por tienda y la elección no se deshace.
 #
+# CAMPO DISTRITO
+#
+# Además hace falta que Shopify habilite los «campos de dirección adicionales»
+# para Perú en esa tienda, y que esta app tenga aprobado el acceso a datos
+# protegidos nivel 2 (campo Address). Ver docs/DISTRITO-EN-SHOPIFY.md.
+#
 # OJO CON `shopify app config link`
 #
 # Ese comando REGENERA este archivo con scopes = "", application_url =
@@ -32,8 +30,8 @@
 # instala SIN PERMISOS y el registro del CarrierService falla con HTTP 403.
 # Después de cada config link, comprueba que este archivo siga completo.
 
-client_id = "PEGAR_CLIENT_ID_DEL_PARTNER_DASHBOARD"
-name = "Envío Perú MI-TIENDA"
+client_id = "c3de50d1466dc40754ea28f814d19b46"
+name = "Tarifa de envío Perú"
 application_url = "https://envio-peru-shopify-surtiplas.onrender.com"
 embedded = true
 
@@ -50,7 +48,6 @@ embedded = true
 #
 # RECUERDA: los scopes que se piden en la instalación salen de la variable de
 # entorno SCOPES en Render, no de aquí. Si no coinciden, manda la variable.
-# Mantén los dos sitios sincronizados.
 scopes = "write_shipping,read_orders,write_orders,read_products,write_draft_orders"
 optional_scopes = [ ]
 use_legacy_install_flow = false
