@@ -200,6 +200,17 @@ eventos de `/diagnostico` están mezclados y no se puede saber de qué tienda es
 cada uno. Si esto vuelve a hacer falta, conviene añadir el dominio de la tienda
 al mensaje del evento.
 
+### Precedente: en superdia lo activó el soporte de Shopify
+
+**superdia.pe funciona porque el soporte de Shopify (Ryan F.) activó ahí los
+campos de dirección adicionales.** No se arregló con código: se pidió y lo
+habilitaron.
+
+Eso convierte esto en un procedimiento conocido, no en una hipótesis. Toda
+tienda nueva necesita la misma petición, y conviene mencionar superdia.pe como
+caso ya resuelto: acelera la respuesta porque el soporte solo tiene que
+replicar una activación que ya hizo.
+
 ### Conclusión operativa
 
 Solo hay un camino, y no pasa por el código:
