@@ -48,7 +48,7 @@ import { concatenateAddress2, splitAddress2 } from "@shopify/worldwide";
  * versión de la API no renderiza nada, lo que hace creer que la extensión no
  * se ejecuta cuando sí lo hace. La consola es fiable; el banner no.
  */
-const DIAGNOSTICO = false;
+const DIAGNOSTICO = true;
 
 export default function extension() {
   render(<Extension />, document.body);
