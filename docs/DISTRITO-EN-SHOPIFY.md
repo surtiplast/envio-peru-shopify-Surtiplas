@@ -158,6 +158,71 @@ la app necesita y que el comerciante tiene que pedir a Shopify.
 
 ---
 
+## CERRADO (17/08/2026): la extensión de checkout no es una alternativa
+
+**Las extensiones de UI de checkout que se muestran en los pasos de información
+y de envío solo funcionan en tiendas Shopify Plus.** Está en la documentación
+de Shopify: los targets `purchase.checkout.*` requieren ese plan. Solo los
+posteriores a la compra (página de agradecimiento y estado del pedido) están
+disponibles en el resto de planes.
+
+`extensions/distrito-checkout` usa
+`purchase.checkout.delivery-address.render-before`. En una tienda que no sea
+Plus **no se ejecuta**, y no hay despliegue ni reinstalación que lo cambie.
+
+### Por qué costó tanto verlo
+
+El fallo es silencioso. La extensión no da error, no aparece en ningún sitio y
+no escribe en consola: sencillamente no se carga. Desde fuera es idéntico a
+«se desplegó mal» o «hay que reinstalar la app», que fue lo que se persiguió
+durante horas.
+
+### Comprobación que lo confirmó (17/08/2026)
+
+Dos tiendas, misma dirección de prueba, mismo distrito:
+
+| | superdia.pe | plazamultipack.pe |
+|---|---|---|
+| App | «Envío Perú» (`e1c11f87…`) | «Tarifa de envío Perú» (`c3de50d1…`) |
+| Servicio | `envio-peru.onrender.com` | `envio-peru-shopify-surtiplas.onrender.com` |
+| `address2` enviado | correcto | correcto |
+| Campo Distrito | **se rellena** | **vacío** |
+| Logs de la extensión | ninguno | ninguno |
+
+En `/diagnostico`, las doce entradas de `checkout.direccion` salieron todas con
+`marca=true` y el distrito correcto. **El código no falla en ninguna de las
+dos.** Y como en superdia el campo se rellena sin que la extensión escriba una
+sola línea, queda claro que **ahí lo separa Shopify de forma nativa**, no la
+extensión.
+
+Nota: las dos tiendas comparten la misma base de datos de Neon, así que los
+eventos de `/diagnostico` están mezclados y no se puede saber de qué tienda es
+cada uno. Si esto vuelve a hacer falta, conviene añadir el dominio de la tienda
+al mensaje del evento.
+
+### Conclusión operativa
+
+Solo hay un camino, y no pasa por el código:
+
+> Pedir al soporte de Shopify que active los **campos de dirección adicionales**
+> (*additional address fields*) para Perú en el dominio `.myshopify.com` de esa
+> tienda concreta.
+
+Es gratuito, se hace tienda por tienda, y en cuanto lo activan el distrito
+empieza a rellenarse solo.
+
+**Mientras tanto no se pierde nada:** el webhook `orders/create` repone el
+distrito con `orderUpdate`, así que el pedido llega completo y se puede
+despachar. Lo único que falla es que el comprador no ve su distrito en pantalla.
+
+### Qué hacer con la extensión
+
+Déjala. No estorba y sirve el día que un cliente esté en Plus. Pero **no la
+cuentes como solución** al dar de alta una tienda nueva: si no es Plus, no
+existe.
+
+---
+
 ## Historial del diagnóstico (13–15/08/2026)
 
 Se conserva porque documenta qué se descartó y por qué. Todo esto se hizo

@@ -1,9 +1,28 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-name = "Tarifa de envío Perú"
 client_id = "c3de50d1466dc40754ea28f814d19b46"
+name = "Tarifa de envío Perú"
 application_url = "https://envio-peru-shopify-surtiplas.onrender.com"
 embedded = true
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app-subscriptions/update"
+  topics = [ "app_subscriptions/update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -16,25 +35,6 @@ redirect_urls = [
   "https://envio-peru-shopify-surtiplas.onrender.com/auth/callback",
   "https://envio-peru-shopify-surtiplas.onrender.com/auth/shopify/callback"
 ]
-
-[webhooks]
-api_version = "2026-07"
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/uninstalled"
-  topics = [ "app/uninstalled" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/orders/create"
-  topics = [ "orders/create" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app-subscriptions/update"
-  topics = [ "app_subscriptions/update" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/gdpr"
-  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
 [app_proxy]
 url = "https://envio-peru-shopify-surtiplas.onrender.com/proxy"
